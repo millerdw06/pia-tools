@@ -33,12 +33,12 @@ if [[ -z "$PIA_CLIENT_ID_FILE" ]]; then
     PIA_CLIENT_ID_FILE="$PIA_CONFIG_DIR/clientid"
 fi
 if [[ -z "$TRANSMISSION_SETTINGS_FILE" ]]; then
-    TRANSMISSION_SETTINGS_FILE='/home/dl/.config/transmission-daemon/settings.json'
+    TRANSMISSION_SETTINGS_FILE='~/.config/transmission/settings.json'
 fi
 if [[ -z "$PIA_OPEN_PORT_FILE" ]]; then
     PIA_OPEN_PORT_FILE="$PIA_CONFIG_DIR/open_port"
 fi
-PIA_OPEN_PORT="$(cat $PIA_OPEN_PORT_FILE 2>/dev/null)"
+    PIA_OPEN_PORT="$(cat $PIA_OPEN_PORT_FILE 2>/dev/null)"
 if [[ -z "$NETWORK_DEVICES" ]]; then
     NETWORK_DEVICES=$(ip route get "$(host privateinternetaccess.com | awk '/has address/ { print $4 }')" | awk '/dev/ { print $5 }')
 fi
@@ -86,8 +86,7 @@ check_ovpn() {
         else
             echo "Transmissiond not running" >&2
         fi
-        _ufw_delete_rule "$PIA_OPEN_PORT"
-        # ufw_unblock
+        systemctl restart iptables
         return 1
     fi
 }
@@ -107,52 +106,14 @@ info() {
     fi
 }
 
-_ufw_port_allowed() {
-    ufw status | grep -E "^$1\s+ALLOW" > /dev/null
+
+
+iptable_peer_port_update() {
+	echo -n "Updating iptables..." 
+	systemctl restart iptables 
+	iptables -A TCP -p tcp --dport $PIA_OPEN_PORT_NEW -j ACCEPT -m comment --comment "pia"
 }
 
-# Delete previous rule from ufw
-_ufw_delete_rule() {
-    if test "$1" && _ufw_port_allowed "$1"; then
-        ufw delete allow "$1"
-    fi
-}
-
-# Add a new rule to ufw
-_ufw_add_new_rule () {
-    if test "$1" && ! _ufw_port_allowed "$1"; then
-        ufw allow "$1"
-    fi
-}
-
-# Update ufw rules
-ufw_update() {
-    # Check if ufw is running
-    systemctl is-active ufw > /dev/null 2>&1 || return 1
-    echo -n "Updating UFW rules... "
-    _ufw_delete_rule "$PIA_OPEN_PORT"
-    _ufw_add_new_rule "$PIA_OPEN_PORT_NEW"
-    ufw reload > /dev/null
-    echo 'Done!'
-}
-
-ufw_allow_non_vpn() {
-    echo -n 'Allowing non-VPN traffic ... '
-    for i in $NETWORK_DEVICES; do
-        ufw delete deny out on $i > /dev/null 2>&1
-        ufw delete deny in on $i > /dev/null 2>&1
-    done
-    echo 'Done!'
-}
-
-ufw_deny_non_vpn() {
-    echo -n 'Denying non-VPN traffic ... '
-    for i in $NETWORK_DEVICES; do
-        ufw deny out on $i > /dev/null 2>&1
-        ufw deny in on $i > /dev/null 2>&1
-    done
-    echo 'Done!'
-}
 
 transmission_peer_port_update() {
     local transmission_peer_port="$(grep 'peer-port\"' $TRANSMISSION_SETTINGS_FILE | grep -Eo '[0-9]+')"
@@ -166,7 +127,7 @@ transmission_peer_port_update() {
             # systemctl restart transmission
             echo 'Checking port...'
             # TODO The sleep timer may need to be adjusted
-            sleep 3 && transmission-remote -pt
+            sleep 5 && transmission-remote -pt
         fi
     else
         # write new listening port to config
@@ -208,8 +169,9 @@ request_port() {
             test "$PIA_OPEN_PORT" && echo "Previous: $PIA_OPEN_PORT"
         fi
         # Update firewall rules
-        ufw_update
-        transmission_peer_port_update # Update Transmission's peer port
+        ##########
+	iptable_peer_port_update
+	transmission_peer_port_update # Update Transmission's peer port
    else
         echo 'Failed'
    fi
@@ -298,7 +260,9 @@ pia_dns() {
 }
 
 google_dns() {
-    _dns '8.8.8.8' '8.8.4.4'
+   # _dns '8.8.8.8' '8.8.4.4'
+   #Hack!  Points to private local dns server
+   _dns '192.168.1.2'
 }
 
 restore_dns() {
@@ -361,7 +325,7 @@ while true; do
             action_dns=google
             shift
             ;;
-        --restore-dns)
+	--restore-dns)
             test "$action_dns" && exit 1
             action_dns=restore
             shift
@@ -423,11 +387,8 @@ case "$action_dns" in
     pia) pia_dns ;;
 esac
 
-# Block/Unblock non-VPN traffic if requested
-case "$action_fw" in
-    disallow) ufw_deny_non_vpn ;;
-    allow) ufw_allow_non_vpn;;
-esac
+# To do...iptables solution to Block Unblock non-VPN traffic if requested
+# not usefully in current network setup...
 
 # Request port forwarding if action_port is set or no other action is
 if test "$action_port"; then
