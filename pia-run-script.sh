@@ -34,11 +34,11 @@ _resetconn(){
 }
 #----------------------------------
 _conn(){
-	if [ `_checkconn` == '1'  ]; then
+	if [ `_checkconn` == '2'  ]; then
 		echo "Connecting to $SERVER"
 		_startconn
-	fi
-	_checkconn
+    fi
+    _status
 }
 _disconn(){
 	if [ `_checkconn` == '1' ]; then
