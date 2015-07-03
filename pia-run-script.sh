@@ -7,34 +7,35 @@ args=$@
 
 SERVER='CA_Toronto'
 
+
 _checkconn(){
-	if [ -h /sys/class/net/tun0 ]; then
+    if [[ -n $(systemctl status pia@$SERVER | grep "running")  ]]; then
 		echo 1
     else
-        echo 2
+        echo 0
     fi
 }  
 _startconn() {
-	if !( systemctl start pia@$SERVER ); then
-		echo $1
+    if !( systemctl start pia@$SERVER ); then
+        exit 1
     fi
-    sleep 2
+    sleep 4
 }
 _stopconn(){
-	if !( systemctl stop pia@$SERVER ); then
-		echo $1
-	fi
-    sleep 2
+    if !( systemctl stop pia@$SERVER ); then
+        exit 1
+    fi
+    sleep 3
 }
 _resetconn(){
-	if !( systemctl restart pia@$SERVER ); then
-		echo $1
-	fi
+    if !( systemctl restart pia@$SERVER ); then
+        exit 1
+    fi
     sleep 4
 }
 #----------------------------------
 _conn(){
-	if [ `_checkconn` == '2'  ]; then
+	if [ `_checkconn` == '0' ]; then
 		echo "Connecting to $SERVER"
 		_startconn
     fi
