@@ -1,8 +1,10 @@
 #!/usr/bin/sh
 
-# Restore DNS settings
-(sleep 5 && pia-tools --restore-dns --check)&
+# Change DNS settings right away
+pia-tools --pia-dns
+# Port forward request will fail if asked too early
+(sleep 5 && pia-tools -r)&
 # Update conky
-(sleep 5 && killall -SIGUSR1 conky)&
+#(sleep 5 && killall -SIGUSR1 conky)&
 
 exit 0

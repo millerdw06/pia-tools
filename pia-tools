@@ -71,7 +71,8 @@ check_root() {
 }
 
 check_transmission() {
-    systemctl is-active transmission > /dev/null 2>&1
+    #systemctl is-active transmission > /dev/null 2>&1
+    pidof transmission-daemon > /dev/null 2>&1
 }
 
 # Checks if the OpenVPN service is running
@@ -81,7 +82,8 @@ check_ovpn() {
         echo 'OpenVPN service not running !' >&2
         if check_transmission; then
             echo -n 'Stopping transmission... '
-            systemctl stop transmission
+            #systemctl stop transmission
+            killall transmission-daemon
             echo 'Done!'
         else
             echo "Transmissiond not running" >&2
@@ -136,7 +138,8 @@ transmission_peer_port_update() {
             echo "Writing new peer port to transmission's settings.json..."
             sed -i 's/\(\"peer-port\":\).*,/\1 '"$PIA_OPEN_PORT_NEW"',/' "$TRANSMISSION_SETTINGS_FILE"
         fi
-        check_ovpn && systemctl restart transmission
+        #check_ovpn && systemctl restart transmission
+        check_ovpn && transmission-daemon -g home/dave/.config/transmission
     fi
     echo 'Done!'
 }
@@ -388,7 +391,7 @@ case "$action_dns" in
 esac
 
 # To do...iptables solution to Block Unblock non-VPN traffic if requested
-# not usefully in current network setup...
+#not usefully in current network setup...
 
 # Request port forwarding if action_port is set or no other action is
 if test "$action_port"; then
