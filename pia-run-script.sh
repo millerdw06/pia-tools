@@ -60,7 +60,12 @@ _status() {
 		echo "VPN - $SERVER: Up"
 	else
 		echo "VPN - $SERVER: Down"
-	fi
+    fi
+    if [ -z `pidof transmission-daemon` ]; then
+        echo "Transmission: Down"
+    else
+        echo "Transmission: Up: `pidof transmission-daemon`"
+    fi
 }
 _help(){
 	echo "-c - connect"
